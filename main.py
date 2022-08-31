@@ -4,7 +4,7 @@ import snscrape.modules.twitter as sntwitter
 import re
 
 	
-@app.route('/tweet-test', methods=["POST"])
+@app.route('/twitter', methods=["POST"])
 def test():
 	keyword = request.json['keyword']
 	if request.json['lang'] == '':
@@ -22,7 +22,7 @@ def test():
 	
 	query = keyword + lang + until + since
 	tweets = []
-	limit = request.json['tweet count']
+	limit = request.json['tweet_count']
 	for tweet in sntwitter.TwitterSearchScraper(query=query).get_items():
 		if len(tweets) == limit:
 			break
