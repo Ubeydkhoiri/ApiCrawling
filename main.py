@@ -1,11 +1,10 @@
-
 from app import app
 from flask import request, jsonify
 import snscrape.modules.twitter as sntwitter
 import re
 
 	
-@app.route('/test', methods=["POST"])
+@app.route('/tweet-test', methods=["POST"])
 def test():
 	keyword = request.json['keyword']
 	if request.json['lang'] == '':
@@ -20,9 +19,10 @@ def test():
 		since = ''
 	else:
 		since = ' since:' + request.json['since']
+	
 	query = keyword + lang + until + since
 	tweets = []
-	limit = 1
+	limit = request.json['tweet count']
 	for tweet in sntwitter.TwitterSearchScraper(query=query).get_items():
 		if len(tweets) == limit:
 			break
