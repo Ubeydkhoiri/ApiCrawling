@@ -1,7 +1,19 @@
+import pandas as pd
+import numpy as np
 from app import app
 from flask import request, jsonify
 import snscrape.modules.twitter as sntwitter
 import re
+from googletrans import Translator
+translator = Translator()
+
+from sklearn.feature_extraction.text import CountVectorizer, TfidfTransformer
+count_vect = CountVectorizer(stop_words='english')
+transformer = TfidfTransformer(norm='l2',sublinear_tf=True)
+
+from sklearn.model_selection import train_test_split
+from sklearn.svm import SVC
+model = SVC()
 
 	
 @app.route('/twitter', methods=["POST"])
@@ -61,6 +73,43 @@ def test():
 						'user_account' : tweet.user,
 						'username' : tweet.user.username})
 	resp = jsonify(tweets)
+	return resp
+
+@app.route('/sentiment', methods=["POST"])
+def sent():
+	df = pd.read_csv('https://raw.githubusercontent.com/Ubeydkhoiri/ApiCrawling/main/tweet_sentiments.csv')
+
+	x_train = df['Tweet']
+	y_train = df['Label']
+
+	x_train_counts = count_vect.fit_transform(x_train)
+	x_train_tfidf = transformer.fit_transform(x_train_counts)
+
+	#model fitting
+	model.fit(x_train_tfidf, y_train)
+
+	text = request.json['content']
+
+	translations = translator.translate(text)
+
+	new_tweet = np.array([translations.text])
+	new_tweet = count_vect.transform(new_tweet)
+	new_tweet = transformer.transform(new_tweet)
+
+	prediction = model.predict(new_tweet)
+	
+	sentiment = []
+
+	if prediction == [1]:
+		hasil = {'mark':'positif','value':1}
+	elif prediction == [0]:
+		hasil = {'mark':'netral','value':0}
+	else:
+		hasil = {'mark':'negatif','value':-1}
+	
+	sentiment.append(hasil)
+	
+	resp = jsonify(sentiment)
 	return resp
 		
 @app.errorhandler(404)
