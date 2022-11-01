@@ -1,9 +1,13 @@
+from collections import Counter
 import pandas as pd
 import numpy as np
 from app import app
 from flask import request, jsonify
 import snscrape.modules.twitter as sntwitter
+import string
 import re
+from Sastrawi.StopWordRemover.StopWordRemoverFactory import StopWordRemoverFactory, StopWordRemover, ArrayDictionary
+from Sastrawi.Stemmer.StemmerFactory import StemmerFactory
 from googletrans import Translator
 translator = Translator()
 
@@ -11,7 +15,6 @@ from sklearn.feature_extraction.text import CountVectorizer, TfidfTransformer
 count_vect = CountVectorizer(stop_words='english')
 transformer = TfidfTransformer(norm='l2',sublinear_tf=True)
 
-from sklearn.model_selection import train_test_split
 from sklearn.svm import SVC
 model = SVC()
 
@@ -110,6 +113,69 @@ def sent():
 	sentiment.append(hasil)
 	
 	resp = jsonify(sentiment)
+	return resp
+
+stop_factory = StopWordRemoverFactory().get_stop_words()
+more_stopwords = [
+	'yg', 'kpd', 'utk', 'cuman', 'deh', 'Btw', 'tapi', 'gua', 'gue', 'lo', 'lu',
+	'kalo', 'trs', 'jd', 'nih', 'ntar', 'nya', 'lg', 'gk', 'dpt', 'dr', 'kpn',
+	'kok', 'kyk', 'donk', 'yah', 'u', 'ya', 'ga', 'gak', 'km', 'eh', 'sih',
+	'bang', 'bro', 'sob', 'mas', 'mba', 'haha', 'wkwk', 'kmrn', 'iy', 'affa',
+	'iyah', 'lho', 'sbnry', 'tuh', 'kzl', 'hahaha', 'weh', 'tuh'
+]
+
+data = stop_factory + more_stopwords
+
+#Separate the previous words with Sastrawi.
+factory = StemmerFactory()
+stemmer = factory.create_stemmer()
+from nltk.tokenize import TweetTokenizer
+happy_emoticons = set([
+	':-)', ':)', ';)', ':o)', ':]', ':3', ':c)', ':x', ':>', '=]', '8)',
+	':-D', ':D', ':^)', '8-D', '8D', 'x-D', 'xD', 'X-D', 'XD', '=-D',
+	'=D', '=-3', ':-))', ':-)', "-')", ':*', ':^*', '>:P', ':-P', ':P',
+	'X-P', 'x-p', 'xp', 'XP', ':-p', ':p', '=p', ':-b', ':b', '>:)', '>;)',
+	'>:-)', '<3'
+])
+sad_emoticons = set([
+	':L', ':-/', '>:/', ':$', '>:[', ':@', ':-(', ':[', ':-||', '=L',
+	':<', ':-<', '=\\', '=/', '>:(', ':(', '>.<', ":'(", ':\\', ':-c',
+	':c', ':(', '>:\\', ':('
+])
+all_emoticons = happy_emoticons.union(sad_emoticons)
+
+def clean_tweets(tweet):
+	tokenizer = TweetTokenizer(preserve_case=False,  
+								strip_handles=True,
+								reduce_len=True)
+	tweet_tokens = tokenizer.tokenize(tweet)
+	tweet_clean = []
+	for word in tweet_tokens:
+		if(word not in data and
+			word not in all_emoticons and
+			word not in string.punctuation):
+				stem_word = stemmer.stem(word)
+				tweet_clean.append(stem_word) 
+	return ' '.join(tweet_clean)
+
+@app.route('/stopword', methods=["POST"])
+def stw():
+	text = request.json['content']
+	text = clean_tweets(text)
+	resp = jsonify(text)
+	return resp
+
+@app.route('/wordcloud', methods=["POST"])
+def wc():
+	content = request.get_json()
+	df = pd.DataFrame(content)
+	text = []
+	for i in df['content']:
+		j = i.split(' ')
+		for k in j:
+			text.append(k)
+	data = Counter(text)
+	resp = jsonify(data)
 	return resp
 		
 @app.errorhandler(404)
