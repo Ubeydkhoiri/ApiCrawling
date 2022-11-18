@@ -119,11 +119,7 @@ def sent():
 
 stop_factory = StopWordRemoverFactory().get_stop_words()
 more_stopwords = [
-	'yg', 'kpd', 'utk', 'cuman', 'deh', 'Btw', 'tapi', 'gua', 'gue', 'lo', 'lu',
-	'kalo', 'trs', 'jd', 'nih', 'ntar', 'nya', 'lg', 'gk', 'dpt', 'dr', 'kpn',
-	'kok', 'kyk', 'donk', 'yah', 'u', 'ya', 'ga', 'gak', 'km', 'eh', 'sih',
-	'bang', 'bro', 'sob', 'mas', 'mba', 'haha', 'wkwk', 'kmrn', 'iy', 'affa',
-	'iyah', 'lho', 'sbnry', 'tuh', 'kzl', 'hahaha', 'weh', 'tuh'
+	
 ]
 
 data = stop_factory + more_stopwords
@@ -131,44 +127,22 @@ data = stop_factory + more_stopwords
 #Separate the previous words with Sastrawi.
 factory = StemmerFactory()
 stemmer = factory.create_stemmer()
-from nltk.tokenize import TweetTokenizer
-happy_emoticons = set([
-	':-)', ':)', ';)', ':o)', ':]', ':3', ':c)', ':x', ':>', '=]', '8)',
-	':-D', ':D', ':^)', '8-D', '8D', 'x-D', 'xD', 'X-D', 'XD', '=-D',
-	'=D', '=-3', ':-))', ':-)', "-')", ':*', ':^*', '>:P', ':-P', ':P',
-	'X-P', 'x-p', 'xp', 'XP', ':-p', ':p', '=p', ':-b', ':b', '>:)', '>;)',
-	'>:-)', '<3'
-])
-sad_emoticons = set([
-	':L', ':-/', '>:/', ':$', '>:[', ':@', ':-(', ':[', ':-||', '=L',
-	':<', ':-<', '=\\', '=/', '>:(', ':(', '>.<', ":'(", ':\\', ':-c',
-	':c', ':(', '>:\\', ':('
-])
-all_emoticons = happy_emoticons.union(sad_emoticons)
-
-def clean_tweets(tweet):
-	tokenizer = TweetTokenizer(preserve_case=False,  
-								strip_handles=True,
-								reduce_len=True)
-	tweet_tokens = tokenizer.tokenize(tweet)
-	tweet_clean = []
-	for word in tweet_tokens:
-		if(word not in data and
-			word not in all_emoticons and
-			word not in string.punctuation):
-				stem_word = stemmer.stem(word)
-				tweet_clean.append(stem_word) 
-	return ' '.join(tweet_clean)
+more_stopwords = ['yg', 'kpd', 'utk', 'cuman', 'deh', 'btw', 'tapi', 'gua', 'gue', 'lo', 'lu',
+	'kalo', 'trs', 'jd', 'nih', 'ntar', 'nya', 'lg', 'gk', 'g', 'dpt', 'dr', 'kpn',
+	'kok', 'kyk', 'donk', 'yah', 'u', 'ya', 'ga', 'gak', 'km', 'eh', 'sih', 
+	'bang', 'bro', 'sob', 'mas', 'mba', 'haha', 'wkwk', 'kmrn', 'iy', 'affa',
+	'iyah', 'lho', 'sbnry', 'tuh', 'kzl', 'hahaha', 'weh', 'tuh']
+stop_words = set(stopwords.words('indonesian') + more_stopwords) 
 
 def clean_text(text):
     text = text.lower()
     text = re.sub('#', 'hastag', text)
     text = ' '.join(re.sub("(@[A-Za-z0-9]+)|([^0-9A-Za-z \t])|(\w+:\/\/\S+)", " ", text).split())
-    text = re.sub(r" \d+", "", text)
-    stop_words = set(stopwords.words('indonesian'))
     word_tokens = word_tokenize(text)
     text = ' '.join([t for t in word_tokens if not t in stop_words])
-    text_clean = re.sub('hastag', '#', text)
+    text = stemmer.stem(text)
+    text = re.sub('hastag', '#', text)
+    text_clean = re.sub(r"\d[A-Za-z0-9]+ ", "", text)
     return text_clean
 
 @app.route('/stopword', methods=["POST"])
