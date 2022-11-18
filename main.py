@@ -8,6 +8,8 @@ import string
 import re
 from Sastrawi.StopWordRemover.StopWordRemoverFactory import StopWordRemoverFactory, StopWordRemover, ArrayDictionary
 from Sastrawi.Stemmer.StemmerFactory import StemmerFactory
+from nltk.corpus import stopwords
+from nltk.tokenize import word_tokenize
 from googletrans import Translator
 translator = Translator()
 
@@ -158,10 +160,21 @@ def clean_tweets(tweet):
 				tweet_clean.append(stem_word) 
 	return ' '.join(tweet_clean)
 
+def clean_text(text):
+    text = text.lower()
+    text = re.sub('#', 'hastag', text)
+    text = ' '.join(re.sub("(@[A-Za-z0-9]+)|([^0-9A-Za-z \t])|(\w+:\/\/\S+)", " ", text).split())
+    text = re.sub(r" \d+", "", text)
+    stop_words = set(stopwords.words('indonesian'))
+    word_tokens = word_tokenize(text)
+    text = ' '.join([t for t in word_tokens if not t in stop_words])
+    text_clean = re.sub('hastag', '#', text)
+    return text_clean
+
 @app.route('/stopword', methods=["POST"])
 def stw():
 	text = request.json['content']
-	text = clean_tweets(text)
+	text = clean_text(text)
 	resp = jsonify(text)
 	return resp
 
