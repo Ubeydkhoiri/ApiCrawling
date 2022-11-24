@@ -4,7 +4,6 @@ import numpy as np
 from app import app
 from flask import request, jsonify
 import snscrape.modules.twitter as sntwitter
-import string
 import re
 from Sastrawi.StopWordRemover.StopWordRemoverFactory import StopWordRemoverFactory, StopWordRemover, ArrayDictionary
 from Sastrawi.Stemmer.StemmerFactory import StemmerFactory
@@ -22,7 +21,7 @@ model = SVC()
 
 	
 @app.route('/twitter', methods=["POST"])
-def test():
+def tweetcrawler():
 	keyword = request.json['keyword']
 	if request.json['lang'] == '':
 		lang = ''
@@ -53,8 +52,13 @@ def test():
 			else:
 				tweet_type = 'original'
 				tweet_reply = None
+			if pd.notna(tweet.coordinates):
+				latlon = str(tweet.coordinates.latitude) + ',' + str(tweet.coordinates.longitude)
+			else:
+				latlon = np.nan
+			
 			tweets.append({'conversation_id' : tweet.conversationId,
-						'coord' : tweet.coordinates,
+						'coordinate': latlon,
 						'date' : tweet.date,
 						'hastag' : tweet.hashtags,
 						'tweet_id' : tweet.id,
@@ -117,21 +121,14 @@ def sent():
 	resp = jsonify(sentiment)
 	return resp
 
-stop_factory = StopWordRemoverFactory().get_stop_words()
-more_stopwords = [
-	
-]
-
-data = stop_factory + more_stopwords
-
 #Separate the previous words with Sastrawi.
 factory = StemmerFactory()
 stemmer = factory.create_stemmer()
-more_stopwords = ['yg', 'kpd', 'utk', 'cuman', 'deh', 'btw', 'tapi', 'gua', 'gue', 'lo', 'lu',
+more_stopwords = ['yg', 'kpd', 'utk', 'cuman', 'deh', 'btw', 'tapi', 'gua', 'gue', 'lo', 'loe', 'lu',
 	'kalo', 'trs', 'jd', 'nih', 'ntar', 'nya', 'lg', 'gk', 'g', 'dpt', 'dr', 'kpn',
-	'kok', 'kyk', 'donk', 'yah', 'u', 'ya', 'ga', 'gak', 'km', 'eh', 'sih', 
+	'kok', 'kyk', 'donk', 'yah', 'u', 'ya', 'ga', 'gak', 'km', 'eh', 'sih', 'si',
 	'bang', 'bro', 'sob', 'mas', 'mba', 'haha', 'wkwk', 'kmrn', 'iy', 'affa',
-	'iyah', 'lho', 'sbnry', 'tuh', 'kzl', 'hahaha', 'weh', 'tuh']
+	'iyah', 'lho', 'sbnry', 'tuh', 'kzl', 'ksl', 'hahaha', 'weh', 'tuh']
 stop_words = set(stopwords.words('indonesian') + more_stopwords) 
 
 def clean_text(text):
