@@ -5,12 +5,9 @@ from app import app
 from flask import request, jsonify
 import snscrape.modules.twitter as sntwitter
 import re
-from Sastrawi.StopWordRemover.StopWordRemoverFactory import StopWordRemoverFactory, StopWordRemover, ArrayDictionary
 from Sastrawi.Stemmer.StemmerFactory import StemmerFactory
 from nltk.corpus import stopwords
 from nltk.tokenize import word_tokenize
-from googletrans import Translator
-translator = Translator()
 
 
 #Separate the previous words with Sastrawi.
