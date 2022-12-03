@@ -12,6 +12,39 @@ from nltk.tokenize import word_tokenize
 from googletrans import Translator
 translator = Translator()
 
+
+#Separate the previous words with Sastrawi.
+factory = StemmerFactory()
+stemmer = factory.create_stemmer()
+more_stopwords = ['yg', 'kpd', 'utk', 'cuman','hanya','deh', 'btw', 'tapi', 'gua', 'gue', 'lo', 'loe', 'lu',
+                  'kalo', 'trs', 'jd', 'nih', 'ntar', 'nya', 'lg', 'yng','ttg','dpt', 'dr', 'kpn', 'on', 
+                  'in', 'btw', 'kok', 'kyk', 'donk', 'yah', 'u', 'ya', 'ga', 'gak', 'km', 'eh', 'sih', 
+                  'si', 'a', 'b','c','d','e', 'f','g','h','i','j','k','l','m','n','o','p','q','r','s',
+                  't','u','v','x','y','z', 'bang', 'bro', 'sob', 'mas', 'mba', 'haha', 'wkwk', 'kmrn', 
+                  'iy', 'doang', 'aja', 'iyah', 'lho', 'sbnry', 'tuh', 'kzl', 'ksl', 'hahaha', 
+                  'weh', 'tuh', 'allahuakbar', 'subhanallah', 'masyaallah', 'rp', 'bbg','gk', 'g', 'ahh',
+                 'byebye','an','pd','ah', 'tdk', 'klw', 'tp', 'dll', 'ad','lgi','banget', 'wkwk', 'kwk', 
+                  'huhu','jg','oh','emg','omg','huhuhu','klo','ih','gt', 'loh', 'dgn', 'ooh']
+
+stop_words = set(stopwords.words('indonesian') + more_stopwords) 
+
+def clean_text(text):
+    text = text.strip().lower()
+    text = ' '.join(([t for t in text.split() if not '/' in t]))
+    text = ' '.join(([t for t in text.split() if not ('wkwk' in t) 
+                      and not ('hehe' in t)
+                      and not ('hihi' in t)
+                      and not ('haha' in t)
+                      and not ('huhu' in t)
+                     and not ('xixi' in t)]))
+    text = re.sub("'","",text) 
+    text = ' '.join(re.sub("(@[A-Za-z0-9]+)|([^0-9A-Za-z \t])|(\w+:\/\/\S+)", " ", text).split())
+    text = ' '.join(re.sub(r"(\d)|([A-Za-z0-9]+\d)|(\d[A-Za-z0-9]+)", " ", text).split())
+    word_tokens = word_tokenize(text)
+    text = ' '.join([t for t in word_tokens if not t in stop_words])
+    text_clean = stemmer.stem(text)
+    return text_clean
+
 from sklearn.feature_extraction.text import CountVectorizer, TfidfTransformer
 count_vect = CountVectorizer(stop_words='english')
 transformer = TfidfTransformer(norm='l2',sublinear_tf=True)
@@ -19,7 +52,17 @@ transformer = TfidfTransformer(norm='l2',sublinear_tf=True)
 from sklearn.svm import SVC
 model = SVC()
 
-	
+df = pd.read_csv('https://raw.githubusercontent.com/Ubeydkhoiri/ApiCrawling/main/tweet_sentiments.csv')
+
+x_train = df['clean']
+y_train = df['label']
+
+x_train_counts = count_vect.fit_transform(x_train)
+x_train_tfidf = transformer.fit_transform(x_train_counts)
+
+#model fitting
+model.fit(x_train_tfidf, y_train)
+
 @app.route('/twitter', methods=["POST"])
 def tweetcrawler():
 	keyword = request.json['keyword']
@@ -86,25 +129,11 @@ def tweetcrawler():
 
 @app.route('/sentiment', methods=["POST"])
 def sent():
-	df = pd.read_csv('https://raw.githubusercontent.com/Ubeydkhoiri/ApiCrawling/main/tweet_sentiments.csv')
-
-	x_train = df['Tweet']
-	y_train = df['Label']
-
-	x_train_counts = count_vect.fit_transform(x_train)
-	x_train_tfidf = transformer.fit_transform(x_train_counts)
-
-	#model fitting
-	model.fit(x_train_tfidf, y_train)
-
 	text = request.json['content']
 
-	translations = translator.translate(text)
-
-	new_tweet = np.array([translations.text])
+	new_tweet = np.array([clean_text(text)])
 	new_tweet = count_vect.transform(new_tweet)
 	new_tweet = transformer.transform(new_tweet)
-
 	prediction = model.predict(new_tweet)
 	
 	sentiment = []
@@ -120,27 +149,6 @@ def sent():
 	
 	resp = jsonify(sentiment)
 	return resp
-
-#Separate the previous words with Sastrawi.
-factory = StemmerFactory()
-stemmer = factory.create_stemmer()
-more_stopwords = ['yg', 'kpd', 'utk', 'cuman', 'deh', 'btw', 'tapi', 'gua', 'gue', 'lo', 'loe', 'lu',
-	'kalo', 'trs', 'jd', 'nih', 'ntar', 'nya', 'lg', 'gk', 'g', 'dpt', 'dr', 'kpn',
-	'kok', 'kyk', 'donk', 'yah', 'u', 'ya', 'ga', 'gak', 'km', 'eh', 'sih', 'si',
-	'bang', 'bro', 'sob', 'mas', 'mba', 'haha', 'wkwk', 'kmrn', 'iy', 'affa',
-	'iyah', 'lho', 'sbnry', 'tuh', 'kzl', 'ksl', 'hahaha', 'weh', 'tuh']
-stop_words = set(stopwords.words('indonesian') + more_stopwords) 
-
-def clean_text(text):
-    text = text.lower()
-    text = re.sub('#', 'hastag', text)
-    text = ' '.join(re.sub("(@[A-Za-z0-9]+)|([^0-9A-Za-z \t])|(\w+:\/\/\S+)", " ", text).split())
-    word_tokens = word_tokenize(text)
-    text = ' '.join([t for t in word_tokens if not t in stop_words])
-    text = stemmer.stem(text)
-    text = re.sub('hastag', '#', text)
-    text_clean = re.sub(r"\d[A-Za-z0-9]+ ", "", text)
-    return text_clean
 
 @app.route('/stopword', methods=["POST"])
 def stw():
