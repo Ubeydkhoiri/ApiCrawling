@@ -8,6 +8,7 @@ import re
 from Sastrawi.Stemmer.StemmerFactory import StemmerFactory
 from nltk.corpus import stopwords
 from nltk.tokenize import word_tokenize
+import joblib
 
 
 #Separate the previous words with Sastrawi.
@@ -17,11 +18,11 @@ more_stopwords = ['yg', 'kpd', 'utk', 'cuman','hanya','deh', 'btw', 'tapi', 'gua
                   'kalo', 'trs', 'jd', 'nih', 'ntar', 'nya', 'lg', 'yng','ttg','dpt', 'dr', 'kpn', 'on', 
                   'in', 'btw', 'kok', 'kyk', 'donk', 'yah', 'u', 'ya', 'ga', 'gak', 'km', 'eh', 'sih', 
                   'si', 'a', 'b','c','d','e', 'f','g','h','i','j','k','l','m','n','o','p','q','r','s',
-                  't','u','v','x','y','z', 'bang', 'bro', 'sob', 'mas', 'mba', 'haha', 'wkwk', 'kmrn', 
-                  'iy', 'doang', 'aja', 'iyah', 'lho', 'sbnry', 'tuh', 'kzl', 'ksl', 'hahaha', 
+                  't','u','v','x','y','z', 'bang', 'bro', 'sob', 'mas', 'mba', 'kmrn', 
+                  'iy', 'doang', 'aja', 'iyah', 'lho', 'sbnry', 'tuh', 'kzl', 'ksl', 
                   'weh', 'tuh', 'allahuakbar', 'subhanallah', 'masyaallah', 'rp', 'bbg','gk', 'g', 'ahh',
                  'byebye','an','pd','ah', 'tdk', 'klw', 'tp', 'dll', 'ad','lgi','banget', 'wkwk', 'kwk', 
-                  'huhu','jg','oh','emg','omg','huhuhu','klo','ih','gt', 'loh', 'dgn', 'ooh']
+                  'huhu','jg','oh','emg','omg','klo','ih','gt', 'loh', 'dgn', 'ooh']
 
 stop_words = set(stopwords.words('indonesian') + more_stopwords) 
 
@@ -33,7 +34,12 @@ def clean_text(text):
                       and not ('hihi' in t)
                       and not ('haha' in t)
                       and not ('huhu' in t)
-                     and not ('xixi' in t)]))
+                      and not ('xixi' in t)
+					  and not ('aaa' in t)
+                      and not ('eee' in t)
+                      and not ('iii' in t)
+                      and not ('ooo' in t)
+                      and not ('uuu' in t)]))
     text = re.sub("'","",text) 
     text = ' '.join(re.sub("(@[A-Za-z0-9]+)|([^0-9A-Za-z \t])|(\w+:\/\/\S+)", " ", text).split())
     text = ' '.join(re.sub(r"(\d)|([A-Za-z0-9]+\d)|(\d[A-Za-z0-9]+)", " ", text).split())
@@ -42,23 +48,9 @@ def clean_text(text):
     text_clean = stemmer.stem(text)
     return text_clean
 
-from sklearn.feature_extraction.text import CountVectorizer, TfidfTransformer
-count_vect = CountVectorizer(stop_words='english')
-transformer = TfidfTransformer(norm='l2',sublinear_tf=True)
-
-from sklearn.svm import SVC
-model = SVC()
-
-df = pd.read_csv('https://raw.githubusercontent.com/Ubeydkhoiri/ApiCrawling/main/tweet_sentiments.csv')
-
-x_train = df['clean']
-y_train = df['label']
-
-x_train_counts = count_vect.fit_transform(x_train)
-x_train_tfidf = transformer.fit_transform(x_train_counts)
-
-#model fitting
-model.fit(x_train_tfidf, y_train)
+count_vect = joblib.load('count_vect')
+transformer = joblib.load('transformer')
+model = joblib.load('model')
 
 @app.route('/twitter', methods=["POST"])
 def tweetcrawler():
