@@ -5,6 +5,7 @@ import requests
 import re
 import pandas as pd
 import numpy as np
+import joblib
 
 from collections import Counter
 from Sastrawi.Stemmer.StemmerFactory import StemmerFactory
@@ -13,34 +14,27 @@ from nltk.tokenize import word_tokenize
 factory = StemmerFactory()
 stemmer = factory.create_stemmer()
 
-stop_words = set(stopwords.words('indonesian')) 
+more_stopwords = ['a','b','c','d','a', 'b','c','d','e', 'f','g','h','i','j','k','l','m','n','o','p','q','r','s',
+                  't','u','v','x','y','z','ala']
+
+stop_words = set(stopwords.words('indonesian') + more_stopwords)
 
 def clean_text(text):
     text = text.strip().lower()
     text = re.sub("'","",text)
+    text = ' '.join(re.sub("(@[A-Za-z0-9]+)|([^0-9A-Za-z \t])|(\w+:\/\/\S+)", " ", text).split())
     text = ' '.join(re.sub(r"(\d)|([A-Za-z0-9]+\d)|(\d[A-Za-z0-9]+)", " ", text).split())
     word_tokens = word_tokenize(text)
     text = ' '.join([t for t in word_tokens if not t in stop_words])
     text_clean = stemmer.stem(text)
     return text_clean
 
-from sklearn.feature_extraction.text import CountVectorizer, TfidfTransformer
-count_vect = CountVectorizer(stop_words='english')
-transformer = TfidfTransformer(norm='l2',sublinear_tf=True)
+count_vect = joblib.load('count_vectNews')
+transformer = joblib.load('transformerNews')
+model = joblib.load('modelNews')
 
-from sklearn.svm import SVC
-model = SVC()
-
-df = pd.read_csv('https://raw.githubusercontent.com/Ubeydkhoiri/ApiCrawling/main/news_sentiment.csv')
-
-x_train = df['content']
-y_train = df['label']
-
-x_train_counts = count_vect.fit_transform(x_train)
-x_train_tfidf = transformer.fit_transform(x_train_counts)
-
-#model fitting
-model.fit(x_train_tfidf, y_train)
+months = {'januari':'01','februari':'02','maret':'03','april':'04','mei':'05','juni':'06','juli':'07',
+'agustus':'08','september':'09','oktober':'10','november':'11','desember':'12','december':'12'}
 
 @app.route('/sentimentnews', methods=["POST"])
 def sent():
@@ -85,7 +79,7 @@ def wc():
 	resp = jsonify(data)
 	return resp
 
-@app.route('/merdeka', methods=["POST"])
+@app.route('/suaramerdeka', methods=["POST"])
 def merdekaNews():
 	keyword = request.json['keyword']
 	pages = request.json['pages']
@@ -100,19 +94,25 @@ def merdekaNews():
 				link = each.a.get('href')
 				news = requests.get(link)
 				soup = BeautifulSoup(news.content)
-				
-				date = soup.find('div',{'class', 'read__info__date'}).text.strip()
-				date1 = ' '.join(date.split(' ')[2:]).replace('|',',')
-				title = soup.find('h1',{'class', 'read__title'}).text.strip()
-				text1 = soup.find('article',{'class', 'read__content clearfix'}).text
-				text2 = re.sub('\n',' ', text1).strip()
-				text3 = re.sub(r'\s+',' ', text2)
-				image = soup.find('div',{'class','photo__img'}).img.get('src')
 
-				articles.append({'created_at':date1,
+				date = soup.find('div',{'class', 'read__info__date'}).text.strip()
+				date = ' '.join(date.split(' ')[2:-1]).replace('|','').lower()
+				for word, replacement in months.items():
+					date = date.replace(word, replacement)
+				date = pd.to_datetime(date)
+				title = soup.find('h1',{'class', 'read__title'}).text.strip()
+				text = soup.find('article',{'class', 'read__content clearfix'}).text
+				text = re.sub('\n',' ', text).strip()
+				text = re.sub(r'\s+',' ', text)
+				image = soup.find('div',{'class','photo__img'}).img.get('src')
+				portal = 'SUARA MERDEKA'
+				
+				articles.append({'media': portal,
+								'created_at':date,
 								'title': title,
-								'content': text3,
-								'image_url': image})
+								'content': text,
+								'url': link,
+								'image': image})
 		except Exception:
 			pass
 
@@ -136,17 +136,24 @@ def beritaNews():
 				soup = BeautifulSoup(news.content)
 
 				date = soup.find('div',{'class', 'text-secondary font-italic mb-4'}).text.strip()
-				date1 = ' '.join(date.split(' ')[1:5])
+				date = ' '.join(date.split(' ')[1:5]).lower()
+				for word, replacement in months.items():
+					date = date.replace(word, replacement)
+				date = pd.to_datetime(date)
 				title = soup.find('div',{'class', 'col-8 read mb-4'}).h1.text
-				text1 = soup.find('div',{'class', 'news-content'}).text.strip()
-				text2 = re.sub('\n',' ', text1)
-				text3 = re.sub(r'\s+',' ', text2)
+				text = soup.find('div',{'class', 'news-content'}).text
+				text = re.sub('\n',' ', text).strip()
+				text = re.sub(r'\s+',' ', text)
 				image = soup.find('div',{'class','col-8 read mb-4'}).img.get('src')
+				portal = 'BERITA JAKARTA'
 
-				articles.append({'created_at':date1,
+
+				articles.append({'media': portal,
+								'created_at':date,
 								'title': title,
-								'content': text3,
-								'image_url': image})
+								'content': text,
+								'url': link,
+								'image': image})
 		except Exception:
 			pass
 
@@ -170,18 +177,24 @@ def pikiranNews():
 				soup = BeautifulSoup(news.content)
 
 				date = soup.find('div',{'class', 'read__info__date'}).text.strip()
-				date1 = date.split(' ')
-				date2 = ' '.join(date1[1:])
+				date = date.split(' ')
+				date = ' '.join(date[1:-1]).lower()
+				for word, replacement in months.items():
+					date = date.replace(word, replacement)
+				date = pd.to_datetime(date)
 				title = soup.find('h1',{'class', 'read__title'}).text.strip()
-				text1 = soup.find('article',{'class', 'read__content clearfix'}).text.strip()
-				text2 = re.sub('\n',' ', text1)
-				text3 = re.sub(r'\s+',' ', text2)
+				text = soup.find('article',{'class', 'read__content clearfix'}).text.strip()
+				text = re.sub('\n',' ', text).strip()
+				text = re.sub(r'\s+',' ', text)
 				image = soup.find('div',{'class','photo__img'}).img.get('src')
-			
-				articles.append({'created_at': date2,
-							'title': title,
-							'content': text3,
-							'image_url': image})
+				portal = 'PIKIRAN RAKYAT'
+
+				articles.append({'media': portal,
+								'created_at':date,
+								'title': title,
+								'content': text,
+								'url': link,
+								'image': image})
 		except Exception:
 			pass
 
@@ -205,23 +218,29 @@ def tempoNews():
 				news = requests.get(link)
 				soup = BeautifulSoup(news.content)
 
-				date = soup.find('h4',{'class', 'date margin-bottom-sm'}).text.split(' ')
-				date1 = ' '.join(date[1:])
+				date = soup.find('h4',{'class', 'date margin-bottom-sm'}).text.lower()
+				date = date.split(',')[-1].strip()
+				date = ' '.join(date.split()[:-1])
+				for word, replacement in months.items():
+					date = date.replace(word, replacement)
+				date = pd.to_datetime(date)
 				title = soup.find('h1',{'class', 'title margin-bottom-sm'}).text.strip()
-				text1 = soup.find('div',{'class', 'detail-in'}).text
-				text2 = re.sub('\n',' ', text1).strip()
+				text = soup.find('div',{'class', 'detail-in'}).text
+				text = re.sub('\n',' ', text).strip()
 				image = soup.find('div',{'class','foto-detail margin-bottom-sm'}).img.get('src')
-				
-				articles.append({'created_at': date1,
+				portal = 'TEMPO'
+
+				articles.append({'media': portal,
+								'created_at':date,
 								'title': title,
-								'content': text2,
-								'image_url': image})
+								'content': text,
+								'url': link,
+								'image': image})
 		except Exception:
 			pass
 
 	resp = jsonify(articles)
 	return resp
-
 
 @app.errorhandler(404)
 def not_found(error=None):
