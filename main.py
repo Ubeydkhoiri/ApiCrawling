@@ -28,7 +28,7 @@ more_stopwords = ['yg', 'kpd', 'utk', 'cuman','hanya','deh', 'btw', 'tapi', 'gua
 
 stop_words = set(stopwords.words('indonesian') + more_stopwords) 
 
-def clean_tweet(text):
+def clean_text(text):
     text = text.strip().lower()
     text = ' '.join(([t for t in text.split() if not '/' in t]))
     text = ' '.join(([t for t in text.split() if not ('wkwk' in t) 
@@ -37,36 +37,28 @@ def clean_tweet(text):
                       and not ('haha' in t)
                       and not ('huhu' in t)
                       and not ('xixi' in t)
-					  and not ('aaa' in t)
-                      and not ('eee' in t)
-                      and not ('iii' in t)
-                      and not ('ooo' in t)
-                      and not ('uuu' in t)]))
-    text = re.sub("'","",text) 
+					  and not ('aa' in t)
+                      and not ('ee' in t)
+                      and not ('ii' in t)
+                      and not ('oo' in t)
+                      and not ('uu' in t)]))
+    text = re.sub("'","",text)
+    text = re.sub('#','hastag',text)
     text = ' '.join(re.sub("(@[A-Za-z0-9]+)|([^0-9A-Za-z \t])|(\w+:\/\/\S+)", " ", text).split())
     text = ' '.join(re.sub(r"(\d)|([A-Za-z0-9]+\d)|(\d[A-Za-z0-9]+)", " ", text).split())
     word_tokens = word_tokenize(text)
     text = ' '.join([t for t in word_tokens if not t in stop_words])
     text_clean = stemmer.stem(text)
+    text_clean = re.sub('hastag','#',text_clean)
     return text_clean
 
 count_tweet = joblib.load('count_vect')
 transTweet = joblib.load('transformer')
 model = joblib.load('model')
 
-def clean_news(text):
-    text = text.strip().lower()
-    text = re.sub("'","",text)
-    text = ' '.join(re.sub("(@[A-Za-z0-9]+)|([^0-9A-Za-z \t])|(\w+:\/\/\S+)", " ", text).split())
-    text = ' '.join(re.sub(r"(\d)|([A-Za-z0-9]+\d)|(\d[A-Za-z0-9]+)", " ", text).split())
-    word_tokens = word_tokenize(text)
-    text = ' '.join([t for t in word_tokens if not t in stop_words])
-    text_clean = stemmer.stem(text)
-    return text_clean
-
 count_news = joblib.load('count_vectNews')
 transNews = joblib.load('transformerNews')
-model = joblib.load('modelNews')
+model_news = joblib.load('modelNews')
 
 months = {'januari':'01','februari':'02','maret':'03','april':'04','mei':'05','juni':'06','juli':'07',
 'agustus':'08','september':'09','oktober':'10','november':'11','desember':'12','december':'12'}
@@ -109,7 +101,6 @@ def tweetcrawler():
 				latlon = str(tweet.coordinates.latitude) + ',' + str(tweet.coordinates.longitude)
 			else:
 				latlon = None
-			
 			tweets.append({'conversation_id' : tweet.conversationId,
 						'coordinate': latlon,
 						'date' : tweet.date,
@@ -141,7 +132,7 @@ def tweetcrawler():
 def sent():
 	text = request.json['content']
 
-	new_tweet = np.array([clean_tweet(text)])
+	new_tweet = np.array([clean_text(text)])
 	new_tweet = count_tweet.transform(new_tweet)
 	new_tweet = transTweet.transform(new_tweet)
 	prediction = model.predict(new_tweet)
@@ -163,7 +154,7 @@ def sent():
 @app.route('/stopword', methods=["POST"])
 def stw():
 	text = request.json['content']
-	text = clean_tweet(text)
+	text = clean_text(text)
 	resp = jsonify(text)
 	return resp
 
@@ -173,21 +164,22 @@ def wc():
 	df = pd.DataFrame(content)
 	text = []
 	for i in df['content']:
+		i = clean_text(i)
 		j = i.split(' ')
 		for k in j:
 			text.append(k)
-	data = Counter(text)
-	resp = jsonify(data)
+	word_freq = Counter(text)
+	resp = jsonify(word_freq)
 	return resp
 
 @app.route('/sentimentnews', methods=["POST"])
 def sentnews():
 	text = request.json['content']
 
-	new_tweet = np.array([clean_news(text)])
-	new_tweet = count_news.transform(new_tweet)
-	new_tweet = transNews.transform(new_tweet)
-	prediction = model.predict(new_tweet)
+	new_text = np.array([clean_text(text)])
+	new_text = count_news.transform(new_text)
+	new_text = transNews.transform(new_text)
+	prediction = model_news.predict(new_text)
 	
 	sentiment = []
 
@@ -203,13 +195,6 @@ def sentnews():
 	resp = jsonify(sentiment)
 	return resp
 
-@app.route('/stopwordnews', methods=["POST"])
-def stwnews():
-	text = request.json['content']
-	text = clean_news(text)
-	resp = jsonify(text)
-	return resp
-
 @app.route('/suaramerdeka', methods=["POST"])
 def merdekaNews():
 	keyword = request.json['keyword']
@@ -220,8 +205,8 @@ def merdekaNews():
 		beautify = BeautifulSoup(merdeka.content)
 		news_list = beautify.find_all('div',{'class','latest__img'})
 
-		try:
-			for each in news_list:
+		for each in news_list:
+			try:
 				link = each.a.get('href')
 				news = requests.get(link)
 				soup = BeautifulSoup(news.content)
@@ -244,8 +229,9 @@ def merdekaNews():
 								'content': text,
 								'url': link,
 								'image': image})
-		except Exception:
-			pass
+				
+			except Exception:
+				pass
 
 	resp = jsonify(articles)
 	return resp
@@ -260,8 +246,8 @@ def beritaNews():
 		beautify = BeautifulSoup(beritajakarta.content)
 		news_list = beautify.find_all('div',{'class','media blog-list news-index'})
 
-		try:
-			for each in news_list:
+		for each in news_list:
+			try:
 				link = each.a.get('href')
 				news = requests.get(link)
 				soup = BeautifulSoup(news.content)
@@ -271,13 +257,13 @@ def beritaNews():
 				for word, replacement in months.items():
 					date = date.replace(word, replacement)
 				date = pd.to_datetime(date)
-				title = soup.find('div',{'class', 'col-8 read mb-4'}).h1.text
+				title = soup.find('div',{'class', 'col-7 read mb-4'}).h1.text
 				text = soup.find('div',{'class', 'news-content'}).text
 				text = re.sub('\n',' ', text).strip()
 				text = re.sub(r'\s+',' ', text)
-				image = soup.find('div',{'class','col-8 read mb-4'}).img.get('src')
+				image = soup.find('div',{'class','col-7 read mb-4'}).img.get('src')
 				portal = 'BERITA JAKARTA'
-
+			
 
 				articles.append({'media': portal,
 								'created_at':date,
@@ -285,8 +271,8 @@ def beritaNews():
 								'content': text,
 								'url': link,
 								'image': image})
-		except Exception:
-			pass
+			except Exception:
+				pass
 
 	resp = jsonify(articles)
 	return resp
@@ -301,8 +287,8 @@ def pikiranNews():
 		beautify = BeautifulSoup(pikiran_rakyat.content)
 		news_list = beautify.find_all('div',{'class','latest__img'})
 		
-		try:
-			for each in news_list:
+		for each in news_list:
+			try:
 				link = each.a.get('href')
 				news = requests.get(link)
 				soup = BeautifulSoup(news.content)
@@ -326,8 +312,8 @@ def pikiranNews():
 								'content': text,
 								'url': link,
 								'image': image})
-		except Exception:
-			pass
+			except Exception:
+				pass
 
 	resp = jsonify(articles)
 	return resp
@@ -343,8 +329,8 @@ def tempoNews():
 		beautify = BeautifulSoup(tempo.content)
 		tempo_search = beautify.find_all('div',{'class','card-box ft240 margin-bottom-sm'})
 
-		try:
-			for each in tempo_search:
+		for each in tempo_search:
+			try:
 				link = each.a.get('href')
 				news = requests.get(link)
 				soup = BeautifulSoup(news.content)
@@ -367,8 +353,8 @@ def tempoNews():
 								'content': text,
 								'url': link,
 								'image': image})
-		except Exception:
-			pass
+			except Exception:
+				pass
 
 	resp = jsonify(articles)
 	return resp
